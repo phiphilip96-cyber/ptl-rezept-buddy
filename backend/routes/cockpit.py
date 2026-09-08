@@ -50,9 +50,13 @@ async def ampel(kunde_id: ObjectId, ziel: str | None = None, tag=None) -> dict:
         farbe = "rot"; gruende.append(f"{inaktiv_tage} Tage inaktiv")
     if gegen_ziel:
         farbe = "rot"; gruende.append(f"Gewicht {trend['differenz_kg']:+.1f} kg gegen das Ziel")
-    if gezaehlt >= 3 and treffer < 3:
+    if gezaehlt < 3:
+        if farbe != "rot":
+            farbe = "gelb"
+        gruende.append(f"erst {gezaehlt} von 7 Tagen getrackt")
+    elif treffer < 3:
         farbe = "rot"; gruende.append(f"nur {treffer} von {gezaehlt} Tagen im Korridor")
-    elif gezaehlt and treffer < 5 and farbe != "rot":
+    elif treffer < 5 and farbe != "rot":
         farbe = "gelb"; gruende.append(f"{treffer} von {gezaehlt} Tagen im Korridor")
     if not checkin_ok and farbe != "rot":
         farbe = "gelb"; gruende.append("Check-in überfällig")

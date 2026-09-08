@@ -87,6 +87,10 @@ async def test_ampel_stufen(client, kunde, mockdb, monkeypatch):
     heute = date.today()
     await client.put("/api/profil", json=PROFIL_LENA)
     assert (await cockpit.ampel(kunde, "muskelaufbau", heute))["farbe"] == "grau"
+    # Nur Check-in, noch keine getrackten Tage -> gelb, nicht gruen
+    await client.post("/api/checkins", json={"antworten": ANTWORTEN})
+    a = await cockpit.ampel(kunde, "muskelaufbau", heute)
+    assert a["farbe"] == "gelb" and "erst 0 von 7" in a["gruende"][0]
     # 6 Tage im Korridor + Check-in diese Woche -> gruen
     for i in range(1, 7):
         await client.post(f"/api/tagebuch/{(heute - timedelta(days=i)).isoformat()}/eintraege",
