@@ -1,0 +1,25 @@
+# /opt/coaching/docker-compose.yml — Rezept-Buddy auf dem Hetzner-Server
+# Repo liegt unter /opt/coaching/ptl-rezept-buddy (git clone oder rsync vom Mac)
+services:
+  mongo:
+    image: mongo:7
+    volumes: ["mongo_data:/data/db"]
+    restart: unless-stopped
+  backend:
+    build: ./ptl-rezept-buddy/backend
+    env_file: ./ptl-rezept-buddy/.env
+    environment:
+      MONGO_URL: mongodb://mongo:27017
+      APP_URL: https://coaching.ptl-pforzheim.de
+    volumes:
+      - ./ptl-rezept-buddy/prompts:/prompts     # Coach-Editor schreibt hierhin
+    ports: ["127.0.0.1:8010:8000"]
+    depends_on: [mongo]
+    restart: unless-stopped
+  frontend:
+    build: ./ptl-rezept-buddy/frontend
+    ports: ["127.0.0.1:8011:80"]
+    depends_on: [backend]
+    restart: unless-stopped
+volumes:
+  mongo_data:

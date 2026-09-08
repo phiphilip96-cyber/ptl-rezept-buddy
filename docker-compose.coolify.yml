@@ -1,0 +1,68 @@
+# PTL Rezept-Buddy — Stack fuer Coolify auf dem Hetzner-Server (49.13.227.244)
+#
+# Warum eine eigene Datei: Der Server laeuft mit Coolify + Traefik, nicht mit
+# einem Host-Caddy. Traefik belegt 80/443 und holt das Zertifikat; deshalb
+# hier KEIN ports-Mapping — die Domain coaching.ptl-pforzheim.de wird in
+# Coolify auf den Service "frontend" (Port 80) gelegt. Dessen nginx proxyt
+# /api ungepuffert an das Backend (SSE-Streaming), ein Caddy-Block entfaellt.
+#
+# Einrichtung in Coolify:
+#   1. Projekt "PTL" -> Ressource "Docker Compose" -> dieses Repo, Zweig main
+#   2. Compose-Datei: docker-compose.coolify.yml
+#   3. Domain https://coaching.ptl-pforzheim.de auf Service "frontend", Port 80
+#   4. Env-Variablen des Backends in Coolify setzen (siehe .env.example):
+#      ANTHROPIC_API_KEY, JWT_SECRET (48 Zeichen zufaellig), COACH_EMAIL,
+#      COACH_PASSWORT, optional MAIL_*. Die environment-Liste unten ist
+#      abschliessend: was hier nicht steht, kommt im Container NIE an.
+#      Erst nach gruenem Test sperren (Lock) — gesperrt leer = unrettbar.
+#   5. BLS-Import einmalig ueber das Coolify-Terminal des backend-Containers:
+#      python scripts/bls_import.py /data/bls4.csv (Datei vorher ins
+#      Volume bls_data laden, z. B. per Coolify-Terminal + curl/scp)
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    # Kein ports-Mapping: nur im Container-Netz erreichbar
+    volumes:
+      - mongo_data:/data/db
+      - backups_data:/backups
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      - MONGO_URL=${MONGO_URL:-mongodb://mongo:27017}
+      - MONGO_DB=${MONGO_DB:-ptl_buddy}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:?ANTHROPIC_API_KEY muss in Coolify gesetzt sein}
+      - ANTHROPIC_MODEL=${ANTHROPIC_MODEL:-claude-sonnet-4-6}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET muss in Coolify gesetzt sein}
+      - APP_URL=${APP_URL:-https://coaching.ptl-pforzheim.de}
+      - MAIL_HOST=${MAIL_HOST:-}
+      - MAIL_PORT=${MAIL_PORT:-587}
+      - MAIL_USER=${MAIL_USER:-}
+      - MAIL_PASS=${MAIL_PASS:-}
+      - MAIL_FROM=${MAIL_FROM:-coach@ptl-pforzheim.de}
+      - COACH_EMAIL=${COACH_EMAIL:-trainwithphil.pt@icloud.com}
+      - COACH_PASSWORT=${COACH_PASSWORT:?COACH_PASSWORT muss in Coolify gesetzt sein}
+    volumes:
+      # Coach-Editor schreibt die Regeln hierhin — ueberlebt Rebuilds
+      - prompts_data:/prompts
+      # Ablage fuer die BLS-CSV und Dumps
+      - bls_data:/data
+      - backups_data:/backups
+    depends_on:
+      - mongo
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    expose:
+      - "80"
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:
+  prompts_data:
+  bls_data:
+  backups_data:

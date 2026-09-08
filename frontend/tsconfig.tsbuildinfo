@@ -1,0 +1,1 @@
+{"root":["./src/main.tsx","./src/components/Plaene.tsx","./src/components/Ui.tsx","./src/lib/api.ts","./src/lib/markdown.tsx","./src/lib/typen.ts","./src/pages/Chat.tsx","./src/pages/Coach.tsx","./src/pages/Login.tsx","./src/pages/Plaene.tsx","./src/pages/Profil.tsx"],"version":"5.9.3"}

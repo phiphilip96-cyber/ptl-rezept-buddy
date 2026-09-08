@@ -1,0 +1,29 @@
+# /etc/caddy/Caddyfile — Hetzner-Server 49.13.227.244
+# Ein Caddy vor allen Diensten. Zertifikate holt Caddy automatisch.
+
+# ---------- P1 (bestehend) ----------
+crm.p1-pforzheim.de {
+    reverse_proxy localhost:8001        # CRM-Backend (FastAPI + statisches React-Build)
+    encode gzip
+}
+
+# ---------- PTL Landingpages + Rechner (aus dem CRM) ----------
+# landingpage.* und leads.* liefern dieselbe CRM-App; Mandant wird über Host erkannt (siehe Brief).
+landingpage.ptl-pforzheim.de, leads.ptl-pforzheim.de {
+    reverse_proxy localhost:8001
+    encode gzip
+}
+
+
+# ---------- Coaching-App (Rezept-Buddy) ----------
+coaching.ptl-pforzheim.de {
+    encode gzip
+    handle /api/* {
+        reverse_proxy localhost:8010 {
+            flush_interval -1          # SSE-Streaming ohne Puffer
+        }
+    }
+    handle {
+        reverse_proxy localhost:8011   # Frontend-Container (nginx)
+    }
+}

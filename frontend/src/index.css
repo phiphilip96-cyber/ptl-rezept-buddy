@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@theme {
+  --color-papier: #F7F5EF;
+  --color-tinte: #17201B;
+  --color-grau: #6B7370;
+  --color-linie: #DDD9CF;
+  --color-wald: #1F5A3A;
+  --color-wald-hell: #E4EEE7;
+  --color-warn: #A6412C;
+  --font-sans: "Avenir Next", "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+}
+
+html { -webkit-text-size-adjust: 100%; }
+body {
+  @apply bg-papier text-tinte font-sans antialiased;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+button, input, textarea, select { font: inherit; }
+:focus-visible { outline: 2px solid var(--color-wald); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+.buddy-text p { margin: 0 0 0.6em; }
+.buddy-text strong { font-weight: 600; }
+.buddy-text ul, .buddy-text ol { padding-left: 1.2em; margin: 0 0 0.6em; }
+.buddy-text li { margin: 0.15em 0; }
+.buddy-text h1, .buddy-text h2, .buddy-text h3 { font-weight: 600; margin: 0.8em 0 0.3em; font-size: 1em; }
