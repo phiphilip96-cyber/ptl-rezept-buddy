@@ -11,11 +11,18 @@ logging.basicConfig(level=logging.INFO)
 
 
 async def coach_seed():
+    """COACH_EMAIL/COACH_PASSWORT aus der Umgebung sind die Wahrheit: Beim Start
+    wird der Hash immer nachgezogen, damit ein in Coolify geaendertes Passwort
+    nach dem Neustart gilt (vorher galt nur der allererste Wert)."""
     if einstellungen.COACH_EMAIL and einstellungen.COACH_PASSWORT:
         email = einstellungen.COACH_EMAIL.lower()
-        if not await db().coaches.find_one({"email": email}):
+        vorhanden = await db().coaches.find_one({"email": email})
+        if not vorhanden:
             await db().coaches.insert_one({"email": email, "name": "Philip", "passwort_hash": pw.hash(einstellungen.COACH_PASSWORT)})
             logging.info("Coach-Account angelegt: %s", email)
+        elif not pw.verify(einstellungen.COACH_PASSWORT, vorhanden["passwort_hash"]):
+            await db().coaches.update_one({"_id": vorhanden["_id"]}, {"$set": {"passwort_hash": pw.hash(einstellungen.COACH_PASSWORT)}})
+            logging.info("Coach-Passwort aus der Umgebung aktualisiert: %s", email)
 
 
 @asynccontextmanager
