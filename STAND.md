@@ -45,3 +45,16 @@ Frontend (React 18 + Vite + TS + Tailwind 4, Mobile-first, keine externen UI-Lib
 - deploy/Caddyfile + deploy/docker-compose.coaching.yml sind nur noch Referenz (Server laeuft unter Coolify/Traefik).
 - Offen: BLS-Import (bls4.csv ins Volume bls_data, `python scripts/bls_import.py /data/bls4.csv`
   im Backend-Terminal von Coolify), erster Live-Test mit echtem Key, PTL-Farben.
+
+## 08.09.2026 — v2-Module M1, M3, Einkaufsliste, Coach-Ampel (39 Tests gruen)
+- M1 Tagebuch: /heute als Startseite (Ring kcal, Balken Protein, Mahlzeiten abhaken, + Eintrag per BLS-Suche
+  oder frei, Gewicht in 10 s), Wochenplan per "Ab Montag aktiv" in den Tag vorbelegt (kunden.aktiver_plan).
+- M3 Check-ins + Koerperdaten: /ich mit Gewichtskurve (7-Tage-Mittel), Wochen-Check-in (6 Fragen), Buddy-Einordnung
+  in 3 Saetzen (kurz.py, scheitert lautlos ohne Key), Coach-Kommentar dazu.
+- M2-Teil: Einkaufsliste am Plan (Rezept direkt aus Zutaten, Wochenplan per Buddy-Aufruf, gecacht), Teilen/Kopieren.
+- Buddy: drei Schreib-Werkzeuge (eintrag_anlegen, tag_lesen, messung_speichern), Kontextbloecke TAGEBUCH und
+  KOERPERDATEN im Systemprompt, neuer Regelabschnitt in prompts/rezept_buddy.md, SSE-Event "aktion".
+- Coach: Ampel je Kunde (gruen/gelb/rot/grau, routes/cockpit.py) in der Liste, Tab "Woche" mit Bilanz 7 Tage,
+  Gewicht, letztem Check-in und Kommentar.
+- Tab-Leiste Heute · Chat · Plaene · Ich. Nicht gebaut: Foto-Erfassung (M1b), Barcode, Fotos im Check-in,
+  Erinnerungen (M4), Training (M6).

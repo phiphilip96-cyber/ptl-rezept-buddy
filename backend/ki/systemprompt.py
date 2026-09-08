@@ -40,8 +40,10 @@ def profilblock(p: ProfilEingabe, heute: date | None = None) -> str:
 
 
 def systemprompt_bauen(p: ProfilEingabe, coach_notizen: list[str] | None = None,
-                       regeln: str | None = None, heute: date | None = None) -> str:
+                       regeln: str | None = None, heute: date | None = None, kontext: str | None = None) -> str:
     teile = [regeln if regeln is not None else regeln_laden(), profilblock(p, heute)]
+    if kontext:
+        teile.append(kontext)
     if coach_notizen:
         teile.append("AKTUELLE NOTIZEN VOM COACH (haben Vorrang):\n- " + "\n- ".join(coach_notizen))
     return "\n\n".join(teile)

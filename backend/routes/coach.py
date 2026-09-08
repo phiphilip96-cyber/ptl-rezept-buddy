@@ -10,6 +10,7 @@ from models.chat import NotizEingabe
 from models.profil import ProfilEingabe
 from routes.chat import konversation_ausgabe, nachricht_ausgabe
 from routes.profil import profil_ausgabe
+from routes.cockpit import ampel, kunden_uebersicht
 
 router = APIRouter(prefix="/coach", tags=["coach"])
 
@@ -38,9 +39,11 @@ async def kunden_liste(coach=Depends(aktueller_coach)):
         letzte = await db().konversationen.find_one({"kunde_id": k["_id"]}, sort=[("letzte_nachricht_am", -1)])
         anzahl = await db().konversationen.count_documents({"kunde_id": k["_id"]})
         profil = await db().profile.find_one({"kunde_id": k["_id"]}, {"ziel": 1})
+        ziel = (profil or {}).get("ziel")
         out.append({"id": str(k["_id"]), "email": k["email"], "vorname": k.get("vorname", ""), "aktiv": k.get("aktiv", True),
-                    "ziel": (profil or {}).get("ziel"), "chats": anzahl,
-                    "letzte_aktivitaet": letzte["letzte_nachricht_am"].isoformat() if letzte else None})
+                    "ziel": ziel, "chats": anzahl,
+                    "letzte_aktivitaet": letzte["letzte_nachricht_am"].isoformat() if letzte else None,
+                    "ampel": await ampel(k["_id"], ziel)})
     return {"kunden": out}
 
 
@@ -71,6 +74,9 @@ async def kunde_loeschen(kunde_id: str, coach=Depends(aktueller_coach)):
     await db().nachrichten.delete_many({"konversation_id": {"$in": konvs}})
     await db().konversationen.delete_many({"kunde_id": kid})
     await db().plaene.delete_many({"kunde_id": kid})
+    await db().tagebuch.delete_many({"kunde_id": kid})
+    await db().messungen.delete_many({"kunde_id": kid})
+    await db().checkins.delete_many({"kunde_id": kid})
     await db().profile.delete_many({"kunde_id": kid})
     await db().magic_links.delete_many({"kunde_id": kid})
     await db().kunden.delete_one({"_id": kid})
@@ -146,3 +152,24 @@ async def kosten(coach=Depends(aktueller_coach)):
         {"$sort": {"_id": -1}}, {"$limit": 6},
     ]
     return {"monate": [dict(m, monat=m.pop("_id")) async for m in db().nachrichten.aggregate(pipeline)]}
+
+
+class KommentarEingabe(BaseModel):
+    inhalt: str = Field(min_length=1, max_length=1000)
+
+
+@router.get("/kunden/{kunde_id}/uebersicht")
+async def uebersicht(kunde_id: str, coach=Depends(aktueller_coach)):
+    """M5-light: Woche auf einen Blick — Ampel, Bilanz 7 Tage, Gewicht, letzter Check-in."""
+    kid = _oid(kunde_id)
+    profil = await db().profile.find_one({"kunde_id": kid}, {"ziel": 1})
+    return await kunden_uebersicht(kid, (profil or {}).get("ziel"))
+
+
+@router.post("/checkins/{checkin_id}/kommentar")
+async def checkin_kommentar(checkin_id: str, eingabe: KommentarEingabe, coach=Depends(aktueller_coach)):
+    res = await db().checkins.update_one({"_id": _oid(checkin_id)},
+                                         {"$set": {"coach_kommentar": eingabe.inhalt, "coach_kommentar_am": datetime.now(timezone.utc)}})
+    if res.matched_count == 0:
+        raise HTTPException(404, "Check-in nicht gefunden")
+    return {"ok": True}

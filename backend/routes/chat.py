@@ -9,6 +9,8 @@ from db import db
 from ki import agent as ki_agent
 from ki.parser import plaene_extrahieren, titel_ableiten
 from ki.systemprompt import systemprompt_bauen
+from ki.kontext import kontext_bauen
+from ki.werkzeuge import SCHREIBENDE, TOOL_DEFS, werkzeuge_fuer
 from models.chat import KonversationEingabe, NachrichtEingabe
 from models.profil import ProfilEingabe
 
@@ -105,11 +107,17 @@ async def nachricht_senden(konv_id: str, eingabe: NachrichtEingabe, kunde=Depend
         await db().konversationen.update_one({"_id": k["_id"]}, {"$set": {"titel": eingabe.inhalt[:60]}})
 
     messages, coach_notizen = await verlauf_fuer_api(k["_id"])
-    system = systemprompt_bauen(profil, coach_notizen)
+    try:
+        kontext = await kontext_bauen(kunde["_id"])
+    except Exception:  # noqa: BLE001 — Kontext ist Zugabe, der Chat muss auch ohne laufen
+        log.exception("Kontextblock fehlgeschlagen")
+        kontext = None
+    system = systemprompt_bauen(profil, coach_notizen, kontext=kontext)
+    werkzeuge = werkzeuge_fuer(kunde["_id"])
 
     async def stream():
         try:
-            async for art, daten in ki_agent.buddy_antworten(system, messages):
+            async for art, daten in ki_agent.buddy_antworten(system, messages, werkzeuge=werkzeuge, werkzeug_defs=TOOL_DEFS):
                 if art == "text":
                     yield _sse("text", daten)
                     continue
@@ -129,6 +137,9 @@ async def nachricht_senden(konv_id: str, eingabe: NachrichtEingabe, kunde=Depend
                     "tokens_in": ergebnis.tokens_in, "tokens_out": ergebnis.tokens_out,
                     "erstellt_am": datetime.now(timezone.utc)})
                 await db().konversationen.update_one({"_id": k["_id"]}, {"$set": {"letzte_nachricht_am": datetime.now(timezone.utc)}})
+                geschrieben = sorted({a["werkzeug"] for a in ergebnis.tool_aufrufe if a.get("werkzeug") in SCHREIBENDE})
+                if geschrieben:
+                    yield _sse("aktion", {"werkzeuge": geschrieben})
                 yield _sse("fertig", {"nachricht_id": str(res.inserted_id), "inhalt": text_sauber, "plan_ids": [str(p) for p in plan_ids]})
         except Exception as e:  # noqa: BLE001
             log.exception("Buddy-Fehler")

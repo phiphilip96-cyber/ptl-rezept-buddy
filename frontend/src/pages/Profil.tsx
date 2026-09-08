@@ -31,14 +31,14 @@ export default function Profil({ erstesMal = false }: { erstesMal?: boolean }) {
 
   async function speichern(e: FormEvent) {
     e.preventDefault(); setLaeuft(true); setFehler(null);
-    try { await api.put("/profil", p); nav("/chat"); }
+    try { await api.put("/profil", p); nav(neu ? "/chat" : "/ich"); }
     catch (err: any) { setFehler(err.message || "Speichern hat nicht geklappt."); }
     finally { setLaeuft(false); }
   }
 
   return (
     <main className="min-h-dvh max-w-md mx-auto">
-      <Kopf titel={neu ? "Dein Profil" : "Profil"} links={!neu && <button onClick={() => nav("/chat")} className="text-wald">Zurück</button>} />
+      <Kopf titel={neu ? "Dein Profil" : "Profil"} links={!neu && <button onClick={() => nav("/ich")} className="text-wald">Zurück</button>} />
       <form onSubmit={speichern} className="px-4 py-5 space-y-5">
         {neu && <p className="text-grau">Der Buddy braucht das einmal, damit jeder Plan wirklich zu dir passt. Dauert zwei Minuten.</p>}
 

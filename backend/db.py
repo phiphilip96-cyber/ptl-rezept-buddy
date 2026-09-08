@@ -30,3 +30,7 @@ async def indexe_anlegen():
     await d.lebensmittel.create_index([("name_de", "text")])
     await d.lebensmittel.create_index("bls_code", unique=True)
     await d.magic_links.create_index("laeuft_ab", expireAfterSeconds=0)
+    # v2-Module: ein Dokument je Kunde und Tag bzw. Woche — Idempotenz ueber den Index
+    await d.tagebuch.create_index([("kunde_id", 1), ("datum", 1)], unique=True)
+    await d.messungen.create_index([("kunde_id", 1), ("datum", 1)], unique=True)
+    await d.checkins.create_index([("kunde_id", 1), ("woche", 1)], unique=True)

@@ -1,11 +1,15 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../lib/api";
-import { Konversation, Nachricht, Profil, ZIEL_TEXT } from "../lib/typen";
+import { Ampel, Checkin, Konversation, Messung, Nachricht, Profil, TagKurz, Trend, ZIEL_TEXT } from "../lib/typen";
+import { GewichtsKurve } from "./Ich";
+
+const AMPEL_FARBE: Record<Ampel["farbe"], string> = { gruen: "bg-green-500", gelb: "bg-amber-400", rot: "bg-red-500", grau: "bg-linie" };
 import { Markdown } from "../lib/markdown";
 import { Auswahl, Eingabe, Fehler, Feld, Knopf, Kopf, Leer } from "../components/Ui";
 
-interface KundeZeile { id: string; email: string; vorname: string; aktiv: boolean; ziel: string | null; chats: number; letzte_aktivitaet: string | null }
+interface KundeZeile { id: string; email: string; vorname: string; aktiv: boolean; ziel: string | null; chats: number; letzte_aktivitaet: string | null; ampel?: Ampel }
+interface Uebersicht { ampel: Ampel; bilanz: TagKurz[]; messungen: Messung[]; gewicht: Trend; letzter_checkin: Checkin | null; aktiver_plan: { titel: string; start_datum: string } | null }
 
 export function CoachLogin() {
   const [email, setEmail] = useState(""); const [pw, setPw] = useState(""); const [fehler, setFehler] = useState<string | null>(null);
@@ -67,10 +71,11 @@ export function CoachKunden() {
           {kunden?.map((k) => (
             <li key={k.id}>
               <Link to={`/coach/kunden/${k.id}`} className={`flex items-center gap-3 py-3 ${k.aktiv ? "" : "opacity-50"}`}>
-                <span className="w-10 h-10 rounded-full bg-wald-hell text-wald font-bold flex items-center justify-center">{k.vorname.slice(0, 1)}</span>
+                <span className="relative w-10 h-10 rounded-full bg-wald-hell text-wald font-bold flex items-center justify-center">{k.vorname.slice(0, 1)}
+                  {k.ampel && <span className={`absolute -right-0.5 -bottom-0.5 w-3.5 h-3.5 rounded-full border-2 border-papier ${AMPEL_FARBE[k.ampel.farbe]}`} title={k.ampel.gruende.join(", ")} />}</span>
                 <span className="flex-1 min-w-0">
                   <span className="block font-medium">{k.vorname} <span className="text-grau font-normal text-sm">{k.ziel ? ZIEL_TEXT[k.ziel as keyof typeof ZIEL_TEXT] : "kein Profil"}</span></span>
-                  <span className="block text-xs text-grau">{k.chats} Chats{k.letzte_aktivitaet ? ` · zuletzt ${new Date(k.letzte_aktivitaet).toLocaleDateString("de-DE")}` : ""}</span>
+                  <span className="block text-xs text-grau">{k.ampel?.gruende[0] ?? `${k.chats} Chats`}{k.letzte_aktivitaet ? ` · zuletzt ${new Date(k.letzte_aktivitaet).toLocaleDateString("de-DE")}` : ""}</span>
                 </span>
               </Link>
             </li>
@@ -86,10 +91,19 @@ export function CoachKunde() {
   const nav = useNavigate();
   const [profil, setProfil] = useState<Profil | null>(null);
   const [konvs, setKonvs] = useState<Konversation[]>([]);
-  const [tab, setTab] = useState<"chats" | "profil">("chats");
+  const [tab, setTab] = useState<"woche" | "chats" | "profil">("woche");
   const [meldung, setMeldung] = useState<string | null>(null);
+  const [ue, setUe] = useState<Uebersicht | null>(null);
+  const [kommentar, setKommentar] = useState("");
+  const ladenUe = () => api.get<Uebersicht>(`/coach/kunden/${id}/uebersicht`).then(setUe);
+
+  async function kommentarSenden(e: FormEvent) {
+    e.preventDefault(); if (!ue?.letzter_checkin || !kommentar.trim()) return;
+    await api.post(`/coach/checkins/${ue.letzter_checkin.id}/kommentar`, { inhalt: kommentar }); setKommentar(""); ladenUe();
+  }
 
   useEffect(() => {
+    ladenUe();
     api.get<{ profil: Profil | null }>(`/coach/kunden/${id}/profil`).then((d) => setProfil(d.profil));
     api.get<{ konversationen: Konversation[] }>(`/coach/kunden/${id}/konversationen`).then((d) => setKonvs(d.konversationen));
   }, [id]);
@@ -109,10 +123,52 @@ export function CoachKunde() {
     <main className="min-h-dvh max-w-md mx-auto">
       <Kopf titel={profil?.vorname ?? "Kunde"} links={<Link to="/coach" className="text-wald">Zurück</Link>} />
       <div className="px-4 pt-3 flex gap-2">
-        {(["chats", "profil"] as const).map((t) => (
-          <button key={t} onClick={() => setTab(t)} className={`h-10 px-4 rounded-full font-medium ${tab === t ? "bg-wald text-white" : "bg-white border border-linie"}`}>{t === "chats" ? "Chats" : "Profil & Ziele"}</button>
+        {(["woche", "chats", "profil"] as const).map((t) => (
+          <button key={t} onClick={() => setTab(t)} className={`h-10 px-4 rounded-full font-medium ${tab === t ? "bg-wald text-white" : "bg-white border border-linie"}`}>{t === "woche" ? "Woche" : t === "chats" ? "Chats" : "Profil & Ziele"}</button>
         ))}
       </div>
+
+      {tab === "woche" && (ue ? (
+        <div className="px-4 py-4 space-y-4">
+          <div className="rounded-2xl bg-white border border-linie p-4">
+            <div className="flex items-center gap-2"><span className={`w-3 h-3 rounded-full ${AMPEL_FARBE[ue.ampel.farbe]}`} /><span className="font-semibold capitalize">{ue.ampel.farbe === "gruen" ? "Grün" : ue.ampel.farbe === "gelb" ? "Gelb" : ue.ampel.farbe === "rot" ? "Rot" : "Keine Daten"}</span></div>
+            <ul className="text-sm text-grau mt-1 list-disc pl-5">{ue.ampel.gruende.map((g) => <li key={g}>{g}</li>)}</ul>
+            {ue.aktiver_plan && <p className="text-sm mt-2">Aktiver Plan: {ue.aktiver_plan.titel} (seit {ue.aktiver_plan.start_datum})</p>}
+          </div>
+          <div className="rounded-2xl bg-white border border-linie p-4">
+            <h3 className="font-semibold">Bilanz 7 Tage</h3>
+            {!ue.bilanz.length && <p className="text-sm text-grau mt-1">Noch nichts getrackt.</p>}
+            <ul className="mt-2 space-y-1 text-sm">
+              {ue.bilanz.map((t) => (
+                <li key={t.datum} className="flex items-center gap-2">
+                  <span className={`w-2 h-2 rounded-full ${t.erledigt === 0 ? "bg-linie" : t.im_korridor ? "bg-green-500" : "bg-amber-400"}`} />
+                  <span className="w-24 text-grau">{t.datum.slice(8)}.{t.datum.slice(5, 7)}.</span>
+                  <span>{t.kcal} / {t.ziel_kcal} kcal · {t.protein_g} / {t.ziel_protein_g} g P</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-2xl bg-white border border-linie p-4">
+            <div className="flex items-baseline justify-between"><h3 className="font-semibold">Gewicht</h3>{ue.gewicht.differenz_kg != null && <span className="text-sm text-grau">{ue.gewicht.differenz_kg > 0 ? "+" : ""}{ue.gewicht.differenz_kg} kg / 4 Wo.</span>}</div>
+            <div className="mt-2"><GewichtsKurve messungen={ue.messungen} /></div>
+          </div>
+          <div className="rounded-2xl bg-white border border-linie p-4">
+            <h3 className="font-semibold">Letzter Check-in</h3>
+            {ue.letzter_checkin ? (
+              <>
+                <div className="text-xs text-grau mt-1">{ue.letzter_checkin.woche} · Schlaf {ue.letzter_checkin.antworten.schlaf} · Energie {ue.letzter_checkin.antworten.energie} · Hunger {ue.letzter_checkin.antworten.hunger} · Stress {ue.letzter_checkin.antworten.stress} · Plan {ue.letzter_checkin.antworten.plan_eingehalten} · Training {ue.letzter_checkin.antworten.training_einheiten}×</div>
+                {ue.letzter_checkin.antworten.freitext && <p className="text-sm mt-2 italic">„{ue.letzter_checkin.antworten.freitext}“</p>}
+                {ue.letzter_checkin.buddy_zusammenfassung && <p className="text-sm mt-2"><span className="font-semibold">Buddy:</span> {ue.letzter_checkin.buddy_zusammenfassung}</p>}
+                {ue.letzter_checkin.coach_kommentar && <p className="text-sm mt-2 rounded-xl bg-wald-hell p-3"><span className="font-semibold">Du:</span> {ue.letzter_checkin.coach_kommentar}</p>}
+                <form onSubmit={kommentarSenden} className="mt-3 flex gap-2">
+                  <input value={kommentar} onChange={(e) => setKommentar(e.target.value)} placeholder="Kommentar an den Kunden …" className="flex-1 h-11 rounded-xl border border-linie bg-white px-3 focus:border-wald" />
+                  <button type="submit" className="h-11 px-4 rounded-full bg-wald text-white font-semibold">Senden</button>
+                </form>
+              </>
+            ) : <p className="text-sm text-grau mt-1">Noch kein Check-in.</p>}
+          </div>
+        </div>
+      ) : <p className="px-4 py-6 text-sm text-grau">Lade …</p>)}
 
       {tab === "chats" && (
         <div className="px-4 py-4">

@@ -6,6 +6,11 @@ import { Markdown } from "../lib/markdown";
 import { PlanAnsicht } from "../components/Plaene";
 import { Kopf } from "../components/Ui";
 
+function naechsterMontag(): string {
+  const d = new Date(); d.setDate(d.getDate() + ((8 - d.getDay()) % 7));
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 export default function Chat() {
   const { id } = useParams();
   const nav = useNavigate();
@@ -16,6 +21,8 @@ export default function Chat() {
   const [laeuft, setLaeuft] = useState(false);
   const [menue, setMenue] = useState(false);
   const [liste, setListe] = useState<Konversation[]>([]);
+  const [aktivPlan, setAktivPlan] = useState<string | null>(null);
+  const [hinweis, setHinweis] = useState<string | null>(null);
   const ende = useRef<HTMLDivElement>(null);
 
   // Ohne id: letzten Chat öffnen oder neuen anlegen. Ohne Profil: zum Profil.
@@ -54,11 +61,19 @@ export default function Chat() {
     await streamen(`/konversationen/${id}/nachrichten`, { inhalt: text }, (event, d) => {
       if (event === "text") patch((n) => ({ ...n, inhalt: n.inhalt + d }));
       else if (event === "plan_gespeichert") patch((n) => ({ ...n, plaene: [...(n.plaene ?? []), { id: d.plan_id, typ: d.typ, titel: d.titel, favorit: false, erstellt_am: t, daten: d.daten }] }));
+      else if (event === "aktion") setHinweis(d.werkzeuge?.includes("messung_speichern") && !d.werkzeuge?.includes("eintrag_anlegen") ? "Gewicht gespeichert – siehst du unter „Ich“." : "Im Tagebuch gebucht – siehst du unter „Heute“.");
       else if (event === "fertig") patch((n) => ({ ...n, id: d.nachricht_id, inhalt: d.inhalt, laeuft: false }));
       else if (event === "fehler") patch((n) => ({ ...n, inhalt: d.meldung, laeuft: false }));
     });
     setLaeuft(false);
     if (konv?.titel === "Neuer Chat") setKonv({ ...konv, titel: text.slice(0, 60) });
+  }
+
+  async function aktivieren(planId: string) {
+    const start = naechsterMontag();
+    await api.put(`/plaene/${planId}/aktivieren`, { start_datum: start });
+    setAktivPlan(planId);
+    setHinweis(`Plan aktiv ab ${start.slice(8)}.${start.slice(5, 7)}. – die Mahlzeiten stehen dann unter „Heute“.`);
   }
 
   async function neuerChat() {
@@ -71,7 +86,7 @@ export default function Chat() {
       <Kopf
         links={<button onClick={() => setMenue(true)} aria-label="Chats" className="text-wald">Chats</button>}
         titel={<span className="inline-flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-wald" />Rezept-Buddy</span>}
-        rechts={<Link to="/profil" className="text-wald">Profil</Link>}
+        rechts={<Link to="/heute" className="text-wald">Heute</Link>}
       />
 
       {menue && (
@@ -87,6 +102,7 @@ export default function Chat() {
               ))}
             </ul>
             <Link to="/plaene" className="block py-3 border-t border-linie font-semibold" onClick={() => setMenue(false)}>Meine Pläne</Link>
+            <Link to="/heute" className="block py-3 border-t border-linie font-semibold" onClick={() => setMenue(false)}>Heute</Link>
           </div>
         </div>
       )}
@@ -116,13 +132,23 @@ export default function Chat() {
                 {n.plaene?.map((p) => p.daten && (
                   <div key={p.id}>
                     <PlanAnsicht daten={p.daten} />
-                    <Link to={`/plaene/${p.id}`} className="inline-block mt-2 text-sm text-wald font-medium">Unter „Meine Pläne" gespeichert</Link>
+                    <div className="mt-2 flex items-center gap-4 text-sm">
+                      <Link to={`/plaene/${p.id}`} className="text-wald font-medium">Unter „Meine Pläne" gespeichert</Link>
+                      {p.typ === "wochenplan" && (aktivPlan === p.id
+                        ? <span className="text-grau">Aktiv ✓</span>
+                        : <button onClick={() => aktivieren(p.id)} className="text-wald font-semibold">Ab Montag aktiv</button>)}
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
         ))}
+        {hinweis && (
+          <div className="rounded-xl bg-wald-hell px-3 py-2 text-sm flex items-center justify-between">
+            <span>{hinweis}</span><button onClick={() => setHinweis(null)} className="text-grau px-1" aria-label="Schließen">×</button>
+          </div>
+        )}
         <div ref={ende} />
       </section>
 

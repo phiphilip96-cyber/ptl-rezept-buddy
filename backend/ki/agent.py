@@ -49,16 +49,22 @@ class AgentErgebnis:
 
 
 async def buddy_antworten(system: str, verlauf: list[dict], client: anthropic.AsyncAnthropic | None = None,
-                          such_fn=lebensmittel_suchen) -> AsyncIterator[tuple[str, str | AgentErgebnis]]:
+                          such_fn=lebensmittel_suchen, werkzeuge: dict | None = None,
+                          werkzeug_defs: list[dict] | None = None) -> AsyncIterator[tuple[str, str | AgentErgebnis]]:
     """Yielded ('text', chunk) während des Streamings und am Ende ('fertig', AgentErgebnis).
-    Führt bis zu MAX_TOOL_AUFRUFE Tool-Runden aus."""
+    Führt bis zu MAX_TOOL_AUFRUFE Tool-Runden aus.
+
+    `werkzeuge` (v2): name -> async fn(eingabe: dict) -> str, dazu `werkzeug_defs`
+    mit den Anthropic-Tool-Definitionen. naehrwerte_suchen bleibt fest eingebaut."""
     client = client or anthropic.AsyncAnthropic(api_key=einstellungen.ANTHROPIC_API_KEY)
     ergebnis = AgentErgebnis()
     messages = list(verlauf)
+    werkzeuge = werkzeuge or {}
+    alle_defs = [TOOL_NAEHRWERTE] + [d for d in (werkzeug_defs or []) if d["name"] in werkzeuge]
     runden = 0
 
     while True:
-        tools = [TOOL_NAEHRWERTE] if runden < einstellungen.MAX_TOOL_AUFRUFE else []
+        tools = alle_defs if runden < einstellungen.MAX_TOOL_AUFRUFE else []
         async with client.messages.stream(
             model=einstellungen.ANTHROPIC_MODEL, max_tokens=4000, temperature=0.7,
             system=system, messages=messages, tools=tools,
@@ -79,10 +85,20 @@ async def buddy_antworten(system: str, verlauf: list[dict], client: anthropic.As
         messages.append({"role": "assistant", "content": [b.model_dump() for b in antwort.content]})
         ergebnisse = []
         for block in tool_bloecke:
-            begriff = str(block.input.get("begriff", ""))
-            treffer = await such_fn(begriff)
-            ergebnis.tool_aufrufe.append({"begriff": begriff, "treffer": treffer})
-            ergebnisse.append({"type": "tool_result", "tool_use_id": block.id, "content": _tool_text(treffer)})
+            eingabe = dict(block.input or {})
+            if block.name in werkzeuge:
+                try:
+                    text = await werkzeuge[block.name](eingabe)
+                except Exception as e:  # noqa: BLE001 — das Modell soll den Fehler sehen, nicht der Kunde
+                    log.exception("Werkzeug %s fehlgeschlagen", block.name)
+                    text = f"Fehler im Werkzeug {block.name}: {e}"
+                ergebnis.tool_aufrufe.append({"werkzeug": block.name, "eingabe": eingabe, "ergebnis": text[:500]})
+            else:
+                begriff = str(eingabe.get("begriff", ""))
+                treffer = await such_fn(begriff)
+                ergebnis.tool_aufrufe.append({"begriff": begriff, "treffer": treffer})
+                text = _tool_text(treffer)
+            ergebnisse.append({"type": "tool_result", "tool_use_id": block.id, "content": text})
         messages.append({"role": "user", "content": ergebnisse})
         runden += 1
 

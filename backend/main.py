@@ -5,7 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from auth import pw
 from config import einstellungen
 from db import db, indexe_anlegen
-from routes import auth, bls, chat, coach, plaene, profil
+from routes import auth, bls, chat, coach, messungen, plaene, profil, tagebuch
 
 logging.basicConfig(level=logging.INFO)
 
@@ -36,7 +36,7 @@ app = FastAPI(title="PTL Rezept-Buddy", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=[einstellungen.APP_URL], allow_credentials=True,
                    allow_methods=["*"], allow_headers=["*"])
 
-for r in (auth, profil, chat, plaene, bls, coach):
+for r in (auth, profil, chat, plaene, bls, coach, tagebuch, messungen):
     app.include_router(r.router, prefix="/api")
 
 
