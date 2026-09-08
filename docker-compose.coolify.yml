@@ -28,7 +28,9 @@ services:
       - backups_data:/backups
 
   backend:
-    build: ./backend
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     restart: unless-stopped
     environment:
       - MONGO_URL=${MONGO_URL:-mongodb://mongo:27017}

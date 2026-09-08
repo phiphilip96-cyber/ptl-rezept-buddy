@@ -6,7 +6,9 @@ services:
     volumes: ["mongo_data:/data/db"]
     restart: unless-stopped
   backend:
-    build: ./ptl-rezept-buddy/backend
+    build:
+      context: ./ptl-rezept-buddy
+      dockerfile: backend/Dockerfile
     env_file: ./ptl-rezept-buddy/.env
     environment:
       MONGO_URL: mongodb://mongo:27017
