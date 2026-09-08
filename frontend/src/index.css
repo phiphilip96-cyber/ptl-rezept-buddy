@@ -1,14 +1,17 @@
 @import "tailwindcss";
 
 @theme {
-  --color-papier: #F7F5EF;
-  --color-tinte: #17201B;
-  --color-grau: #6B7370;
-  --color-linie: #DDD9CF;
-  --color-wald: #1F5A3A;
-  --color-wald-hell: #E4EEE7;
+  /* PTL-CI aus der Landingpage (ptl.html): Teal als Akzent, Tinte/Grau/Linie
+     wie dort. Die Token-Namen bleiben (wald = Akzent), damit die Komponenten
+     unveraendert bleiben. */
+  --color-papier: #F4F7F8;
+  --color-tinte: #2B2F31;
+  --color-grau: #5C5C5C;
+  --color-linie: #DFE5E7;
+  --color-wald: #0E96A8;
+  --color-wald-hell: #E6F4F6;
   --color-warn: #A6412C;
-  --font-sans: "Avenir Next", "Helvetica Neue", Helvetica, Arial, system-ui, sans-serif;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
 }
 
 html { -webkit-text-size-adjust: 100%; }
