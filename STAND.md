@@ -34,3 +34,14 @@ Frontend (React 18 + Vite + TS + Tailwind 4, Mobile-first, keine externen UI-Lib
   NICHT mit einem Host-Caddy + systemctl wie in deploy/Caddyfile angenommen. Weg: Coaching-App als
   eigene Coolify-Ressource (Docker Compose), Domain coaching.ptl-pforzheim.de auf den Frontend-Service;
   Backend-Proxy im nginx des Frontends (SSE ohne Puffer dort sicherstellen).
+
+## 08.09.2026 — LIVE unter https://coaching.ptl-pforzheim.de (Coolify)
+- Coolify-Projekt "PTL Coaching", Ressource aus GitHub-Repo phiphilip96-cyber/ptl-rezept-buddy
+  (Build Compose, docker-compose.coolify.yml), Domain auf Service frontend, Push auf main deployt.
+- /api/gesund 200, Coach-Login geprueft. Secrets: JWT_SECRET zufaellig (bleibt),
+  ANTHROPIC_API_KEY PLATZHALTER (echten Schluessel in Coolify eintragen, dann Redeploy),
+  COACH_PASSWORT Testwert (in Coolify aendern, main.py zieht den Hash beim Start nach).
+- Scheduled Task "Mongo-Backup naechtlich" 03:30 (mongodump ins Volume backups_data, 14 Tage), Testlauf ok.
+- deploy/Caddyfile + deploy/docker-compose.coaching.yml sind nur noch Referenz (Server laeuft unter Coolify/Traefik).
+- Offen: BLS-Import (bls4.csv ins Volume bls_data, `python scripts/bls_import.py /data/bls4.csv`
+  im Backend-Terminal von Coolify), erster Live-Test mit echtem Key, PTL-Farben.
